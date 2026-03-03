@@ -1,0 +1,167 @@
+"use client";
+
+import { useState } from "react";
+import { FileText, FileIcon, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
+import type { Document } from "@/types/document";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "extracted":
+    case "ready":
+      return "default";
+    case "uploaded":
+    case "extracting":
+    case "chunking":
+    case "embedding":
+      return "secondary";
+    case "failed":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
+function FileTypeIcon({ type }: { type: string }) {
+  if (type === "pdf") {
+    return <FileText className="h-8 w-8 text-red-500" />;
+  }
+  return <FileIcon className="h-8 w-8 text-blue-500" />;
+}
+
+function DocumentCard({
+  doc,
+  onDelete,
+}: {
+  doc: Document;
+  onDelete: (doc: Document) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 p-4">
+        <FileTypeIcon type={doc.file_type} />
+        <div className="flex-1 min-w-0">
+          <p className="truncate font-medium text-sm">{doc.filename}</p>
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+            <span>{formatBytes(doc.size_bytes)}</span>
+            <span>{formatDate(doc.created_at)}</span>
+            {doc.page_count && <span>{doc.page_count} page(s)</span>}
+          </div>
+        </div>
+        <Badge variant={statusVariant(doc.status)}>{doc.status}</Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete ${doc.filename}`}
+          onClick={() => onDelete(doc)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function DocumentList() {
+  const { data, isLoading, error } = useDocuments();
+  const deleteMutation = useDeleteDocument();
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4" role="alert">
+        <p className="text-sm text-destructive">
+          Failed to load documents. Make sure the backend is running.
+        </p>
+      </div>
+    );
+  }
+
+  if (!data || data.documents.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <FileText className="h-12 w-12 text-muted-foreground/50" />
+        <p className="mt-4 text-sm font-medium">No documents yet</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Upload a PDF or DOCX to get started.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-3">
+        {data.documents.map((doc) => (
+          <DocumentCard key={doc.id} doc={doc} onDelete={setDeleteTarget} />
+        ))}
+      </div>
+
+      <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete document</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{deleteTarget?.filename}&rdquo;? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
