@@ -9,21 +9,21 @@ DocuChat is a full-stack RAG (Retrieval-Augmented Generation) application built 
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 14+, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | Python 3.11+, FastAPI, Pydantic |
+| Backend | Python 3.11+, FastAPI, SQLAlchemy, Alembic |
 | Package Manager | pnpm (frontend), pip (backend) |
 | Containerization | Docker + docker-compose |
 | CI/CD | GitHub Actions |
 
 ## Current Status
 
-**Stage 1 complete:** Project scaffolding and monorepo setup.
+**Stage 2 complete:** Document upload system with text extraction.
 
-- Landing page with project overview
-- Global layout with sidebar navigation
-- FastAPI backend with health check endpoint (`GET /api/health`)
-- Docker Compose for local development
-- ESLint + Prettier (frontend), Ruff (backend)
-- CI pipeline placeholder
+- Drag-and-drop document upload (PDF/DOCX) with progress bar
+- Document list with status badges, file info, and delete with confirmation
+- Backend upload API with MIME type validation and 20MB size limit
+- PDF text extraction (page-by-page) and DOCX text extraction
+- SQLite database with SQLAlchemy async ORM and Alembic migrations
+- 14 passing backend tests covering upload, extraction, and CRUD
 
 ## Quick Start
 
