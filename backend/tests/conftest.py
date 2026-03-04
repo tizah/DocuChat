@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -33,7 +34,7 @@ async def db_session():
 
 @pytest.fixture
 async def client(db_session: AsyncSession):
-    """HTTP client wired to use the test database."""
+    """HTTP client wired to use the test database, with pipeline mocked."""
 
     async def override_get_db():
         try:
@@ -45,11 +46,29 @@ async def client(db_session: AsyncSession):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
+    # Mock process_document so upload tests don't need real embeddings/vector store
+    mock_pipeline = AsyncMock()
+
+    async def fake_pipeline(doc_id, file_path, file_type, db):
+        from sqlalchemy import select
+
+        from app.models.document import Document
+
+        result = await db.execute(select(Document).where(Document.id == doc_id))
+        document = result.scalar_one_or_none()
+        if document:
+            document.status = "ready"
+            document.page_count = 1
+            await db.flush()
+
+    mock_pipeline.side_effect = fake_pipeline
+
+    with patch("app.routers.documents.process_document", mock_pipeline):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            yield ac
 
     app.dependency_overrides.clear()
 
@@ -63,3 +82,14 @@ def upload_dir(tmp_path):
     settings.upload_dir = str(tmp_path / "uploads")
     yield settings.upload_dir
     settings.upload_dir = original
+
+
+@pytest.fixture
+def chroma_dir(tmp_path):
+    """Provide a temp ChromaDB directory and patch settings."""
+    from app.config import settings
+
+    original = settings.chroma_persist_dir
+    settings.chroma_persist_dir = str(tmp_path / "chroma")
+    yield settings.chroma_persist_dir
+    settings.chroma_persist_dir = original

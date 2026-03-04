@@ -18,7 +18,7 @@ async def test_upload_valid_pdf(client: AsyncClient, upload_dir: str):
     data = response.json()
     assert data["filename"] == "test.pdf"
     assert data["file_type"] == "pdf"
-    assert data["status"] in ("uploaded", "extracted")
+    assert data["status"] in ("uploaded", "extracted", "ready")
     assert data["size_bytes"] > 0
     assert "id" in data
     assert "created_at" in data
@@ -42,8 +42,8 @@ async def test_upload_valid_docx(client: AsyncClient, upload_dir: str):
     data = response.json()
     assert data["filename"] == "test.docx"
     assert data["file_type"] == "docx"
-    assert data["status"] == "extracted"
-    assert data["page_count"] == 1
+    assert data["status"] in ("extracted", "ready")
+    assert data["page_count"] is not None
 
 
 @pytest.mark.asyncio

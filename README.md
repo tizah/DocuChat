@@ -16,14 +16,14 @@ DocuChat is a full-stack RAG (Retrieval-Augmented Generation) application built 
 
 ## Current Status
 
-**Stage 2 complete:** Document upload system with text extraction.
+**Stage 3 complete:** Document chunking and embedding pipeline.
 
-- Drag-and-drop document upload (PDF/DOCX) with progress bar
-- Document list with status badges, file info, and delete with confirmation
-- Backend upload API with MIME type validation and 20MB size limit
-- PDF text extraction (page-by-page) and DOCX text extraction
-- SQLite database with SQLAlchemy async ORM and Alembic migrations
-- 14 passing backend tests covering upload, extraction, and CRUD
+- Full processing pipeline: upload → extract → chunk → embed → index
+- Recursive text chunking with tiktoken token counting (configurable size/overlap)
+- OpenAI embedding provider with batch processing and exponential backoff retry
+- ChromaDB vector store with cosine similarity search and document filtering
+- Real-time processing status tracking with step-based progress UI
+- 33 passing backend tests covering chunking, embedding, vector store, and CRUD
 
 ## Quick Start
 
