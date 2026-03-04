@@ -11,6 +11,19 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_upload_size: int = 20 * 1024 * 1024  # 20MB
 
+    # Embedding
+    embedding_provider: str = "openai"
+    openai_api_key: str = ""
+    openai_embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+
+    # Chunking
+    chunk_size: int = 1000  # tokens
+    chunk_overlap: int = 200  # tokens
+
+    # Vector store
+    chroma_persist_dir: str = "./chroma_data"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
