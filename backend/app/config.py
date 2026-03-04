@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # Vector store
     chroma_persist_dir: str = "./chroma_data"
 
+    # LLM
+    llm_provider: str = "openai"
+    anthropic_api_key: str = ""
+    openai_chat_model: str = "gpt-4o-mini"
+    anthropic_chat_model: str = "claude-sonnet-4-20250514"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

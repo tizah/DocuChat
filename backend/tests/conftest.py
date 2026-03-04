@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database import Base, get_db
 from app.main import app
+from app.models.conversation import Conversation, Message
 
 
 @pytest.fixture
@@ -82,6 +83,25 @@ def upload_dir(tmp_path):
     settings.upload_dir = str(tmp_path / "uploads")
     yield settings.upload_dir
     settings.upload_dir = original
+
+
+@pytest.fixture
+async def conversation_with_messages(db_session):
+    """Create a conversation with messages for testing."""
+    conv = Conversation(title="Test conversation")
+    db_session.add(conv)
+    await db_session.flush()
+
+    msg1 = Message(conversation_id=conv.id, role="user", content="Hello")
+    msg2 = Message(
+        conversation_id=conv.id,
+        role="assistant",
+        content="Hi there!",
+        source_chunks='[{"chunk_id": "c1", "filename": "test.pdf"}]',
+    )
+    db_session.add_all([msg1, msg2])
+    await db_session.flush()
+    return conv
 
 
 @pytest.fixture
