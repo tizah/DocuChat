@@ -22,6 +22,14 @@ class DocumentListResponse(BaseModel):
     total: int
 
 
+class DocumentStatusResponse(BaseModel):
+    id: str
+    status: str
+    error_message: str | None = None
+    page_count: int | None = None
+    chunk_count: int = 0
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str

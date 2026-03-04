@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, FileIcon, Trash2, Loader2 } from "lucide-react";
+import { FileText, FileIcon, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import type { Document } from "@/types/document";
+import { isProcessing } from "@/types/document";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -32,10 +33,10 @@ function formatDate(dateStr: string): string {
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
-    case "extracted":
     case "ready":
       return "default";
     case "uploaded":
+    case "extracted":
     case "extracting":
     case "chunking":
     case "embedding":
@@ -45,6 +46,45 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
     default:
       return "outline";
   }
+}
+
+const PIPELINE_STEPS = ["extracting", "chunking", "embedding", "ready"] as const;
+
+function ProcessingIndicator({ status }: { status: string }) {
+  if (!isProcessing(status) && status !== "ready") return null;
+
+  const currentIdx = PIPELINE_STEPS.indexOf(status as (typeof PIPELINE_STEPS)[number]);
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5">
+      {PIPELINE_STEPS.map((step, idx) => {
+        const isDone = idx < currentIdx || status === "ready";
+        const isCurrent = step === status;
+
+        return (
+          <div key={step} className="flex items-center gap-1">
+            {isDone ? (
+              <CheckCircle className="h-3 w-3 text-green-500" />
+            ) : isCurrent ? (
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            ) : (
+              <div className="h-3 w-3 rounded-full border border-muted-foreground/30" />
+            )}
+            <span
+              className={`text-[10px] ${
+                isDone ? "text-green-600" : isCurrent ? "text-primary font-medium" : "text-muted-foreground/50"
+              }`}
+            >
+              {step.charAt(0).toUpperCase() + step.slice(1)}
+            </span>
+            {idx < PIPELINE_STEPS.length - 1 && (
+              <div className="mx-0.5 h-px w-3 bg-muted-foreground/20" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function FileTypeIcon({ type }: { type: string }) {
@@ -61,10 +101,14 @@ function DocumentCard({
   doc: Document;
   onDelete: (doc: Document) => void;
 }) {
+  const processing = isProcessing(doc.status);
+
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-4">
-        <FileTypeIcon type={doc.file_type} />
+      <CardContent className="flex items-start gap-4 p-4">
+        <div className="mt-0.5">
+          <FileTypeIcon type={doc.file_type} />
+        </div>
         <div className="flex-1 min-w-0">
           <p className="truncate font-medium text-sm">{doc.filename}</p>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
@@ -72,16 +116,25 @@ function DocumentCard({
             <span>{formatDate(doc.created_at)}</span>
             {doc.page_count && <span>{doc.page_count} page(s)</span>}
           </div>
+          {(processing || doc.status === "ready") && <ProcessingIndicator status={doc.status} />}
+          {doc.status === "failed" && doc.error_message && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              <span className="truncate">{doc.error_message}</span>
+            </div>
+          )}
         </div>
-        <Badge variant={statusVariant(doc.status)}>{doc.status}</Badge>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete ${doc.filename}`}
-          onClick={() => onDelete(doc)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Badge variant={statusVariant(doc.status)}>{doc.status}</Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete ${doc.filename}`}
+            onClick={() => onDelete(doc)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -2,14 +2,42 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { Document, DocumentListResponse } from "@/types/document";
+import type { Document, DocumentListResponse, DocumentStatus } from "@/types/document";
+import { isProcessing } from "@/types/document";
 
 export function useDocuments() {
+  const query = useQuery<DocumentListResponse>({
+    queryKey: ["documents"],
+    queryFn: async () => {
+      const { data } = await api.get<DocumentListResponse>("/documents");
+      return data;
+    },
+  });
+
+  // Poll every 2 seconds if any document is still processing
+  const hasProcessing = query.data?.documents.some((d) => isProcessing(d.status));
+
   return useQuery<DocumentListResponse>({
     queryKey: ["documents"],
     queryFn: async () => {
       const { data } = await api.get<DocumentListResponse>("/documents");
       return data;
+    },
+    refetchInterval: hasProcessing ? 2000 : false,
+  });
+}
+
+export function useDocumentStatus(documentId: string | null) {
+  return useQuery<DocumentStatus>({
+    queryKey: ["document-status", documentId],
+    queryFn: async () => {
+      const { data } = await api.get<DocumentStatus>(`/documents/${documentId}/status`);
+      return data;
+    },
+    enabled: !!documentId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && isProcessing(status) ? 2000 : false;
     },
   });
 }
