@@ -43,6 +43,9 @@ docker-compose.override.yml
 # Uploads (local dev)
 backend/uploads/
 
+# ChromaDB (local dev)
+backend/chroma_data/
+
 # Database (local dev)
 *.db
 *.sqlite3
