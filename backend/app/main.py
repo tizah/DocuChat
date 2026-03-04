@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
 from app.models.chunk import Chunk  # noqa: F401
-from app.routers import documents
+from app.models.conversation import Conversation, Message  # noqa: F401
+from app.routers import chat, conversations, documents
 
 
 @asynccontextmanager
@@ -34,6 +35,8 @@ app.add_middleware(
 )
 
 app.include_router(documents.router)
+app.include_router(chat.router)
+app.include_router(conversations.router)
 
 
 @app.get("/api/health")
