@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { Bot, FileText, Loader2, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { SourceChunk } from "@/types/chat";
 
 interface ChatMessage {
@@ -40,7 +39,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
         {messages.map((msg, i) => (
           <MessageBubble
@@ -52,7 +51,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
         ))}
         <div ref={bottomRef} />
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 

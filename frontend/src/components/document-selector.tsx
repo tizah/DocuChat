@@ -2,7 +2,6 @@
 
 import { FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDocuments } from "@/hooks/use-documents";
 
 interface DocumentSelectorProps {
@@ -65,7 +64,7 @@ export function DocumentSelector({
             : "Select all"}
         </button>
       </div>
-      <ScrollArea className="max-h-48">
+      <div className="max-h-48 overflow-y-auto">
         <div className="flex flex-col gap-1">
           {readyDocs.map((doc) => (
             <label
@@ -81,7 +80,7 @@ export function DocumentSelector({
             </label>
           ))}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
