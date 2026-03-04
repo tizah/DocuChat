@@ -66,6 +66,7 @@ export function useChat(): UseChatReturn {
         const decoder = new TextDecoder();
         let buffer = "";
         let currentSourceChunks: SourceChunk[] | undefined;
+        let currentEvent = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -77,25 +78,19 @@ export function useChat(): UseChatReturn {
 
           for (const line of lines) {
             if (line.startsWith("event:")) {
-              const eventType = line.slice(6).trim();
-
-              // Find the next data line
-              const dataLineIndex = lines.indexOf(line) + 1;
-              if (dataLineIndex < lines.length) {
-                const dataLine = lines[dataLineIndex];
-                if (dataLine?.startsWith("data:")) {
-                  const data = dataLine.slice(5).trim();
-                  handleSSEEvent(
-                    eventType,
-                    data,
-                    setMessages,
-                    setConversationId,
-                    (chunks) => {
-                      currentSourceChunks = chunks;
-                    },
-                  );
-                }
-              }
+              currentEvent = line.slice(6).trim();
+            } else if (line.startsWith("data:") && currentEvent) {
+              const data = line.slice(5);
+              handleSSEEvent(
+                currentEvent,
+                data,
+                setMessages,
+                setConversationId,
+                (chunks) => {
+                  currentSourceChunks = chunks;
+                },
+              );
+              currentEvent = "";
             }
           }
         }
@@ -154,9 +149,12 @@ function handleSSEEvent(
   setConversationId: React.Dispatch<React.SetStateAction<string | null>>,
   onSourceChunks: (chunks: SourceChunk[]) => void,
 ) {
+  // SSE spec: "data: value" has one optional leading space after colon
+  const trimmedData = data.startsWith(" ") ? data.slice(1) : data;
+
   switch (eventType) {
     case "metadata": {
-      const metadata: ChatMetadata = JSON.parse(data);
+      const metadata: ChatMetadata = JSON.parse(trimmedData);
       setConversationId(metadata.conversation_id);
       if (metadata.source_chunks?.length) {
         onSourceChunks(metadata.source_chunks);
@@ -164,13 +162,14 @@ function handleSSEEvent(
       break;
     }
     case "token": {
+      // Use trimmedData for tokens — preserves meaningful whitespace
       setMessages((prev) => {
         const updated = [...prev];
         const lastMsg = updated[updated.length - 1];
         if (lastMsg?.role === "assistant") {
           updated[updated.length - 1] = {
             ...lastMsg,
-            content: lastMsg.content + data,
+            content: lastMsg.content + trimmedData,
           };
         }
         return updated;
@@ -184,7 +183,7 @@ function handleSSEEvent(
         if (lastMsg?.role === "assistant") {
           updated[updated.length - 1] = {
             ...lastMsg,
-            content: `Error: ${data}`,
+            content: `Error: ${trimmedData}`,
           };
         }
         return updated;
