@@ -1,0 +1,104 @@
+import logging
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.chunk import Chunk
+from app.models.document import Document
+from app.services.chunker import chunk_pages
+from app.services.embedder import get_embedding_provider
+from app.services.extractor import extract_text
+from app.services.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
+
+
+async def process_document(
+    document_id: str,
+    file_path: str,
+    file_type: str,
+    db: AsyncSession,
+) -> None:
+    """Run the full processing pipeline: extract → chunk → embed → store vectors.
+
+    Updates document status at each stage. On failure, sets status to "failed"
+    with an error message.
+    """
+    result = await db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        logger.error("Document %s not found", document_id)
+        return
+
+    try:
+        # Stage 1: Extract
+        document.status = "extracting"
+        await db.flush()
+
+        pages = extract_text(file_path, file_type)
+        document.page_count = len(pages)
+
+        if not pages:
+            document.status = "failed"
+            document.error_message = "No text content could be extracted from the document."
+            await db.flush()
+            return
+
+        # Stage 2: Chunk
+        document.status = "chunking"
+        await db.flush()
+
+        chunks = chunk_pages(pages, document_id)
+
+        # Store chunks in the database
+        db_chunks: list[Chunk] = []
+        for chunk in chunks:
+            db_chunk = Chunk(
+                document_id=chunk.document_id,
+                chunk_index=chunk.chunk_index,
+                page_number=chunk.page_number,
+                content=chunk.content,
+                token_count=chunk.token_count,
+            )
+            db.add(db_chunk)
+            db_chunks.append(db_chunk)
+        await db.flush()
+
+        # Stage 3: Embed
+        document.status = "embedding"
+        await db.flush()
+
+        provider = get_embedding_provider()
+        texts = [c.content for c in chunks]
+        embeddings = provider.embed(texts)
+
+        # Stage 4: Store in vector store
+        vector_store = VectorStore()
+        vector_store.add(
+            ids=[c.id for c in db_chunks],
+            embeddings=embeddings,
+            documents=texts,
+            metadatas=[
+                {
+                    "document_id": chunk.document_id,
+                    "chunk_index": chunk.chunk_index,
+                    "page_number": chunk.page_number,
+                }
+                for chunk in chunks
+            ],
+        )
+
+        document.status = "ready"
+        await db.flush()
+        logger.info(
+            "Document %s processed: %d pages, %d chunks",
+            document_id,
+            len(pages),
+            len(chunks),
+        )
+
+    except Exception as e:
+        logger.exception("Failed to process document %s", document_id)
+        document.status = "failed"
+        document.error_message = str(e)
+        await db.flush()

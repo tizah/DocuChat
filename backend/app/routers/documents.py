@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.models.chunk import Chunk
 from app.models.document import Document
-from app.schemas import DocumentListResponse, DocumentResponse
-from app.services.extractor import extract_text
+from app.schemas import DocumentListResponse, DocumentResponse, DocumentStatusResponse
+from app.services.pipeline import process_document
+from app.services.vector_store import VectorStore
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -66,15 +68,9 @@ async def upload_document(file: UploadFile, db: DbSession) -> Document:
     db.add(document)
     await db.flush()
 
-    try:
-        pages = extract_text(str(file_path), file_ext)
-        document.status = "extracted"
-        document.page_count = len(pages)
-    except Exception as e:
-        document.status = "failed"
-        document.error_message = str(e)
+    # Run the full processing pipeline
+    await process_document(doc_id, str(file_path), file_ext, db)
 
-    await db.flush()
     await db.refresh(document)
     return document
 
@@ -100,6 +96,32 @@ async def get_document(document_id: str, db: DbSession) -> Document:
     return document
 
 
+@router.get("/{document_id}/status", response_model=DocumentStatusResponse)
+async def get_document_status(document_id: str, db: DbSession) -> dict:
+    result = await db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": "Document not found."},
+        )
+
+    chunk_count = 0
+    if document.status in ("ready", "embedding", "chunking"):
+        chunk_result = await db.execute(
+            select(Chunk).where(Chunk.document_id == document_id)
+        )
+        chunk_count = len(list(chunk_result.scalars().all()))
+
+    return {
+        "id": document.id,
+        "status": document.status,
+        "error_message": document.error_message,
+        "page_count": document.page_count,
+        "chunk_count": chunk_count,
+    }
+
+
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(document_id: str, db: DbSession) -> None:
     result = await db.execute(select(Document).where(Document.id == document_id))
@@ -110,6 +132,21 @@ async def delete_document(document_id: str, db: DbSession) -> None:
             detail={"code": "NOT_FOUND", "message": "Document not found."},
         )
 
+    # Delete chunks from database
+    chunk_result = await db.execute(
+        select(Chunk).where(Chunk.document_id == document_id)
+    )
+    for chunk in chunk_result.scalars().all():
+        await db.delete(chunk)
+
+    # Delete from vector store
+    try:
+        vector_store = VectorStore()
+        vector_store.delete_by_document(document_id)
+    except Exception:
+        pass  # Vector store cleanup is best-effort
+
+    # Delete file from disk
     upload_dir = Path(settings.upload_dir)
     file_path = upload_dir / f"{document.id}.{document.file_type}"
     if file_path.exists():
