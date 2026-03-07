@@ -30,6 +30,30 @@ class DocumentStatusResponse(BaseModel):
     chunk_count: int = 0
 
 
+class ChunkResponse(BaseModel):
+    id: str
+    document_id: str
+    chunk_index: int
+    page_number: int
+    content: str
+    token_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class ChunkListResponse(BaseModel):
+    chunks: list[ChunkResponse]
+    total: int
+    document_id: str
+
+
+class ChunkWithContextResponse(BaseModel):
+    chunk: ChunkResponse
+    previous_chunk: ChunkResponse | None = None
+    next_chunk: ChunkResponse | None = None
+    document_filename: str
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str

@@ -11,7 +11,12 @@ from app.config import settings
 from app.database import get_db
 from app.models.chunk import Chunk
 from app.models.document import Document
-from app.schemas import DocumentListResponse, DocumentResponse, DocumentStatusResponse
+from app.schemas import (
+    ChunkListResponse,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentStatusResponse,
+)
 from app.services.pipeline import process_document
 from app.services.vector_store import VectorStore
 
@@ -120,6 +125,30 @@ async def get_document_status(document_id: str, db: DbSession) -> dict:
         "page_count": document.page_count,
         "chunk_count": chunk_count,
     }
+
+
+@router.get("/{document_id}/chunks", response_model=ChunkListResponse)
+async def list_document_chunks(
+    document_id: str,
+    db: DbSession,
+    page: int | None = None,
+) -> dict:
+    result = await db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_FOUND", "message": "Document not found."},
+        )
+
+    query = select(Chunk).where(Chunk.document_id == document_id)
+    if page is not None:
+        query = query.where(Chunk.page_number == page)
+    query = query.order_by(Chunk.chunk_index)
+
+    chunk_result = await db.execute(query)
+    chunks = list(chunk_result.scalars().all())
+    return {"chunks": chunks, "total": len(chunks), "document_id": document_id}
 
 
 @router.delete("/{document_id}", status_code=204)

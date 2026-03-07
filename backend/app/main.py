@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.models.chunk import Chunk  # noqa: F401
 from app.models.conversation import Conversation, Message  # noqa: F401
-from app.routers import chat, conversations, documents
+from app.routers import chat, chunks, conversations, documents
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(documents.router)
+app.include_router(chunks.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
 
