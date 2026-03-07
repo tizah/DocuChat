@@ -7,11 +7,14 @@ import { Separator } from "@/components/ui/separator";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { DocumentSelector } from "@/components/document-selector";
+import { SourcePanel } from "@/components/source-panel";
 import { UploadZone } from "@/components/upload-zone";
 import { useChat } from "@/hooks/use-chat";
+import type { SourceChunk } from "@/types/chat";
 
 export default function ChatPage() {
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedSource, setSelectedSource] = useState<SourceChunk | null>(null);
   const { messages, isStreaming, sendMessage, resetChat } = useChat();
 
   const handleSend = (message: string) => {
@@ -50,7 +53,11 @@ export default function ChatPage() {
 
         {/* Chat area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <ChatMessages messages={messages} isStreaming={isStreaming} />
+          <ChatMessages
+            messages={messages}
+            isStreaming={isStreaming}
+            onSourceClick={setSelectedSource}
+          />
           <ChatInput
             onSend={handleSend}
             disabled={selectedDocIds.length === 0}
@@ -58,6 +65,14 @@ export default function ChatPage() {
           />
         </div>
       </div>
+
+      <SourcePanel
+        source={selectedSource}
+        open={!!selectedSource}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSource(null);
+        }}
+      />
     </div>
   );
 }
