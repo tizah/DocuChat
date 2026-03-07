@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { FileText, FileIcon, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -110,7 +111,12 @@ function DocumentCard({
           <FileTypeIcon type={doc.file_type} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="truncate font-medium text-sm">{doc.filename}</p>
+          <Link
+            href={`/documents/${doc.id}`}
+            className="truncate font-medium text-sm hover:underline"
+          >
+            {doc.filename}
+          </Link>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span>{formatBytes(doc.size_bytes)}</span>
             <span>{formatDate(doc.created_at)}</span>
