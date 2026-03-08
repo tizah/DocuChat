@@ -6,10 +6,15 @@ from app.models.document import Document
 
 
 @pytest.fixture
-async def document_with_chunks(db_session: AsyncSession):
+async def document_with_chunks(db_session: AsyncSession, client):
     """Create a document with 5 chunks across 2 pages."""
+    # Get the test user's ID
+    me_resp = await client.get("/api/auth/me")
+    user_id = me_resp.json()["id"]
+
     doc = Document(
         id="doc-1",
+        user_id=user_id,
         filename="test.pdf",
         file_type="pdf",
         size_bytes=1024,

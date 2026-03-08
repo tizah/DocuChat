@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -12,6 +12,9 @@ class Document(Base):
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)

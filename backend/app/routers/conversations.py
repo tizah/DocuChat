@@ -1,13 +1,15 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.dependencies import CurrentUser
+from app.exceptions import NotFoundError
 from app.models.conversation import Conversation
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -50,39 +52,41 @@ class ConversationListResponse(BaseModel):
 
 
 @router.get("", response_model=ConversationListResponse)
-async def list_conversations(db: DbSession) -> dict:
+async def list_conversations(db: DbSession, current_user: CurrentUser) -> dict:
     result = await db.execute(
-        select(Conversation).order_by(Conversation.updated_at.desc())
+        select(Conversation)
+        .where(Conversation.user_id == current_user.id)
+        .order_by(Conversation.updated_at.desc())
     )
     conversations = list(result.scalars().all())
     return {"conversations": conversations, "total": len(conversations)}
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
-async def get_conversation(conversation_id: str, db: DbSession) -> Conversation:
+async def get_conversation(
+    conversation_id: str, db: DbSession, current_user: CurrentUser
+) -> Conversation:
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.id == conversation_id)
+        .where(Conversation.id == conversation_id, Conversation.user_id == current_user.id)
         .options(selectinload(Conversation.messages))
     )
     conversation = result.scalar_one_or_none()
     if not conversation:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "NOT_FOUND", "message": "Conversation not found."},
-        )
+        raise NotFoundError("Conversation not found")
     return conversation
 
 
 @router.delete("/{conversation_id}", status_code=204)
-async def delete_conversation(conversation_id: str, db: DbSession) -> None:
+async def delete_conversation(
+    conversation_id: str, db: DbSession, current_user: CurrentUser
+) -> None:
     result = await db.execute(
-        select(Conversation).where(Conversation.id == conversation_id)
+        select(Conversation).where(
+            Conversation.id == conversation_id, Conversation.user_id == current_user.id
+        )
     )
     conversation = result.scalar_one_or_none()
     if not conversation:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "NOT_FOUND", "message": "Conversation not found."},
-        )
+        raise NotFoundError("Conversation not found")
     await db.delete(conversation)

@@ -1,10 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser
+from app.exceptions import NotFoundError
 from app.models.chunk import Chunk
 from app.models.document import Document
 from app.schemas import ChunkWithContextResponse
@@ -15,20 +17,21 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/{chunk_id}", response_model=ChunkWithContextResponse)
-async def get_chunk_with_context(chunk_id: str, db: DbSession) -> dict:
+async def get_chunk_with_context(chunk_id: str, db: DbSession, current_user: CurrentUser) -> dict:
     result = await db.execute(select(Chunk).where(Chunk.id == chunk_id))
     chunk = result.scalar_one_or_none()
     if not chunk:
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "NOT_FOUND", "message": "Chunk not found."},
-        )
+        raise NotFoundError("Chunk not found")
 
-    # Get document filename
+    # Get document filename — also verifies user ownership
     doc_result = await db.execute(
-        select(Document).where(Document.id == chunk.document_id)
+        select(Document).where(
+            Document.id == chunk.document_id, Document.user_id == current_user.id
+        )
     )
-    document = doc_result.scalar_one()
+    document = doc_result.scalar_one_or_none()
+    if not document:
+        raise NotFoundError("Chunk not found")
 
     # Get previous chunk (chunk_index - 1)
     prev_result = await db.execute(

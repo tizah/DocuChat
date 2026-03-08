@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, File, Hash, Layers, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Calendar, File, Hash, Layers, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDocument } from "@/hooks/use-documents";
 import { useDocumentChunks } from "@/hooks/use-chunks";
 import type { Chunk } from "@/types/document";
@@ -68,8 +69,29 @@ export default function DocumentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex flex-col h-full">
+        <div className="border-b px-6 py-3 shrink-0 space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="p-6 space-y-6 max-w-4xl">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-3">
+                  <Skeleton className="h-3 w-12 mb-1" />
+                  <Skeleton className="h-4 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Skeleton className="h-10 w-full rounded-md" />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-md" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -165,11 +187,13 @@ export default function DocumentDetailPage() {
                 {chunks.map((chunk) => (
                   <div
                     key={chunk.id}
-                    className={`rounded-md border p-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`rounded-md border p-3 text-sm leading-relaxed ${
                       search ? "bg-accent/30" : ""
                     }`}
                   >
-                    {search ? highlightMatch(chunk.content, search) : chunk.content}
+                    {search
+                      ? highlightMatch(chunk.content.replace(/\n/g, " "), search)
+                      : chunk.content.replace(/\n/g, " ")}
                   </div>
                 ))}
               </div>

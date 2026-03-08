@@ -3,7 +3,7 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,8 @@ from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
 
 from app.database import get_db
+from app.dependencies import CurrentUser
+from app.exceptions import NotFoundError, ValidationError
 from app.models.conversation import Conversation, Message
 from app.services.rag import (
     build_context,
@@ -18,6 +20,7 @@ from app.services.rag import (
     retrieve_chunks,
     stream_rag_response,
 )
+from app.services.rate_limiter import chat_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -33,34 +36,37 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest, db: DbSession):
+async def chat(request: ChatRequest, db: DbSession, current_user: CurrentUser):
     if not request.document_ids:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "NO_DOCUMENTS", "message": "Select at least one document to chat."},
+        raise ValidationError(
+            "Select at least one document to chat.",
+            code="NO_DOCUMENTS",
         )
+
+    # Rate limit check
+    chat_rate_limiter.check(current_user.id)
 
     # Get or create conversation
     conversation: Conversation
     if request.conversation_id:
         result = await db.execute(
             select(Conversation)
-            .where(Conversation.id == request.conversation_id)
+            .where(
+                Conversation.id == request.conversation_id,
+                Conversation.user_id == current_user.id,
+            )
             .options(selectinload(Conversation.messages))
         )
         conv = result.scalar_one_or_none()
         if not conv:
-            raise HTTPException(
-                status_code=404,
-                detail={"code": "NOT_FOUND", "message": "Conversation not found."},
-            )
+            raise NotFoundError("Conversation not found")
         conversation = conv
     else:
         # Create new conversation with first ~50 chars of message as title
         title = request.message[:50].strip()
         if len(request.message) > 50:
             title += "..."
-        conversation = Conversation(title=title)
+        conversation = Conversation(title=title, user_id=current_user.id)
         db.add(conversation)
         await db.flush()
 

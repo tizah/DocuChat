@@ -31,12 +31,15 @@ async def process_document(
         return
 
     try:
+        logger.info("Starting pipeline for document %s", document_id)
+
         # Stage 1: Extract
         document.status = "extracting"
         await db.flush()
 
         pages = extract_text(file_path, file_type)
         document.page_count = len(pages)
+        logger.info("Extraction complete for document %s: %d pages", document_id, len(pages))
 
         if not pages:
             document.status = "failed"
@@ -49,6 +52,7 @@ async def process_document(
         await db.flush()
 
         chunks = chunk_pages(pages, document_id)
+        logger.info("Chunking complete for document %s: %d chunks", document_id, len(chunks))
 
         # Store chunks in the database
         db_chunks: list[Chunk] = []
@@ -71,6 +75,7 @@ async def process_document(
         provider = get_embedding_provider()
         texts = [c.content for c in chunks]
         embeddings = provider.embed(texts)
+        logger.info("Embedding complete for document %s", document_id)
 
         # Stage 4: Store in vector store
         vector_store = VectorStore()
@@ -91,7 +96,7 @@ async def process_document(
         document.status = "ready"
         await db.flush()
         logger.info(
-            "Document %s processed: %d pages, %d chunks",
+            "Pipeline finished for document %s: %d pages, %d chunks",
             document_id,
             len(pages),
             len(chunks),

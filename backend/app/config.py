@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     # Vector store
     chroma_persist_dir: str = "./chroma_data"
 
+    # Auth
+    jwt_secret_key: str = "change-me-in-production-use-a-real-secret-key"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    chat_rate_limit: int = 20  # messages per minute per user
+
     # LLM
     llm_provider: str = "openai"
     anthropic_api_key: str = ""

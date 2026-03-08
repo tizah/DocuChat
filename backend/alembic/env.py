@@ -8,6 +8,7 @@ from app.database import Base
 from app.models.chunk import Chunk  # noqa: F401
 from app.models.conversation import Conversation, Message  # noqa: F401
 from app.models.document import Document  # noqa: F401
+from app.models.user import RefreshToken, User  # noqa: F401
 
 config = context.config
 

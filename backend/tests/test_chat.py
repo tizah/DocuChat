@@ -1,6 +1,5 @@
 """Tests for chat endpoint and RAG pipeline."""
 
-import json
 from unittest.mock import patch
 
 import pytest
@@ -12,9 +11,13 @@ from app.services.vector_store import SearchResult
 
 
 @pytest.fixture
-async def ready_document(db_session):
+async def ready_document(db_session, client):
     """Create a ready document for chat testing."""
+    me_resp = await client.get("/api/auth/me")
+    user_id = me_resp.json()["id"]
+
     doc = Document(
+        user_id=user_id,
         filename="test.pdf",
         file_type="application/pdf",
         size_bytes=1024,
@@ -91,7 +94,7 @@ async def test_chat_no_documents(client: AsyncClient):
         "/api/chat",
         json={"message": "Hello", "document_ids": []},
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert resp.json()["detail"]["code"] == "NO_DOCUMENTS"
 
 

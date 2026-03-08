@@ -10,6 +10,10 @@ from app.database import Base, get_db
 from app.main import app
 from app.models.conversation import Conversation, Message
 
+TEST_USER_EMAIL = "test@example.com"
+TEST_USER_PASSWORD = "testpassword123"
+TEST_USER_NAME = "Test User"
+
 
 @pytest.fixture
 async def db_session():
@@ -35,7 +39,7 @@ async def db_session():
 
 @pytest.fixture
 async def client(db_session: AsyncSession):
-    """HTTP client wired to use the test database, with pipeline mocked."""
+    """HTTP client wired to use the test database, auto-registered and authenticated."""
 
     async def override_get_db():
         try:
@@ -47,29 +51,51 @@ async def client(db_session: AsyncSession):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Mock process_document so upload tests don't need real embeddings/vector store
-    mock_pipeline = AsyncMock()
+    # Mock _run_pipeline_background so upload tests don't need real embeddings/vector store
+    # The background task uses its own db session, so we mock the entire background function
+    mock_bg_pipeline = AsyncMock()
 
-    async def fake_pipeline(doc_id, file_path, file_type, db):
-        from sqlalchemy import select
-
-        from app.models.document import Document
-
-        result = await db.execute(select(Document).where(Document.id == doc_id))
-        document = result.scalar_one_or_none()
-        if document:
-            document.status = "ready"
-            document.page_count = 1
-            await db.flush()
-
-    mock_pipeline.side_effect = fake_pipeline
-
-    with patch("app.routers.documents.process_document", mock_pipeline):
+    with patch("app.routers.documents._run_pipeline_background", mock_bg_pipeline):
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",
         ) as ac:
+            # Auto-register a test user so all endpoints work
+            resp = await ac.post(
+                "/api/auth/register",
+                json={
+                    "email": TEST_USER_EMAIL,
+                    "password": TEST_USER_PASSWORD,
+                    "name": TEST_USER_NAME,
+                },
+            )
+            assert resp.status_code == 201
+            # Store cookies from registration for subsequent requests
+            ac.cookies.update(resp.cookies)
             yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def unauth_client(db_session: AsyncSession):
+    """HTTP client with no auth cookies, for testing 401s."""
+
+    async def override_get_db():
+        try:
+            yield db_session
+            await db_session.commit()
+        except Exception:
+            await db_session.rollback()
+            raise
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        yield ac
 
     app.dependency_overrides.clear()
 
@@ -86,9 +112,13 @@ def upload_dir(tmp_path):
 
 
 @pytest.fixture
-async def conversation_with_messages(db_session):
+async def conversation_with_messages(db_session, client):
     """Create a conversation with messages for testing."""
-    conv = Conversation(title="Test conversation")
+    # Get the test user's ID from the client
+    resp = await client.get("/api/auth/me")
+    user_id = resp.json()["id"]
+
+    conv = Conversation(title="Test conversation", user_id=user_id)
     db_session.add(conv)
     await db_session.flush()
 

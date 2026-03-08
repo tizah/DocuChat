@@ -54,8 +54,8 @@ export function SourcePanel({ source, open, onOpenChange }: SourcePanelProps) {
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
                     Previous context
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {data.previous_chunk.content}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {data.previous_chunk.content.replace(/\n/g, " ")}
                   </p>
                 </div>
               )}
@@ -64,8 +64,8 @@ export function SourcePanel({ source, open, onOpenChange }: SourcePanelProps) {
                 <p className="text-[10px] font-medium uppercase tracking-wider text-primary mb-1">
                   Matched chunk
                 </p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {data.chunk.content}
+                <p className="text-sm leading-relaxed">
+                  {data.chunk.content.replace(/\n/g, " ")}
                 </p>
               </div>
 
@@ -74,8 +74,8 @@ export function SourcePanel({ source, open, onOpenChange }: SourcePanelProps) {
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
                     Next context
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {data.next_chunk.content}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {data.next_chunk.content.replace(/\n/g, " ")}
                   </p>
                 </div>
               )}

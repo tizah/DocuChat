@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex h-14 items-center border-b border-border px-6">
+      <header className="flex h-14 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-2 font-semibold text-lg">
           <FileText className="h-6 w-6 text-primary" />
           <span>DocuChat</span>
         </div>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/login">Sign In</Link>
+        </Button>
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center px-4">
@@ -24,7 +27,7 @@ export default function Home() {
 
           <div className="mt-8">
             <Button asChild size="lg">
-              <Link href="/documents">Get Started</Link>
+              <Link href="/register">Get Started</Link>
             </Button>
           </div>
 

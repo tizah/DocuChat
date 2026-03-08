@@ -18,7 +18,7 @@ async def test_upload_valid_pdf(client: AsyncClient, upload_dir: str):
     data = response.json()
     assert data["filename"] == "test.pdf"
     assert data["file_type"] == "pdf"
-    assert data["status"] in ("uploaded", "extracted", "ready")
+    assert data["status"] in ("uploaded", "extracted", "ready", "processing")
     assert data["size_bytes"] > 0
     assert "id" in data
     assert "created_at" in data
@@ -42,8 +42,7 @@ async def test_upload_valid_docx(client: AsyncClient, upload_dir: str):
     data = response.json()
     assert data["filename"] == "test.docx"
     assert data["file_type"] == "docx"
-    assert data["status"] in ("extracted", "ready")
-    assert data["page_count"] is not None
+    assert data["status"] in ("extracted", "ready", "processing")
 
 
 @pytest.mark.asyncio
@@ -52,7 +51,7 @@ async def test_upload_invalid_file_type(client: AsyncClient, upload_dir: str):
         "/api/documents/upload",
         files={"file": ("test.txt", b"hello world", "text/plain")},
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     data = response.json()
     assert data["detail"]["code"] == "INVALID_FILE_TYPE"
 
@@ -78,7 +77,7 @@ async def test_upload_oversized_file(client: AsyncClient, upload_dir: str):
                     )
                 },
             )
-        assert response.status_code == 400
+        assert response.status_code == 422
         data = response.json()
         assert data["detail"]["code"] == "FILE_TOO_LARGE"
     finally:
