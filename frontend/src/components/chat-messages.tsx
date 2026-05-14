@@ -14,9 +14,10 @@ interface ChatMessage {
 interface ChatMessagesProps {
   messages: ChatMessage[];
   isStreaming: boolean;
+  onSourceClick?: (source: SourceChunk) => void;
 }
 
-export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
+export function ChatMessages({ messages, isStreaming, onSourceClick }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
             message={msg}
             isLast={i === messages.length - 1}
             isStreaming={isStreaming}
+            onSourceClick={onSourceClick}
           />
         ))}
         <div ref={bottomRef} />
@@ -59,10 +61,12 @@ function MessageBubble({
   message,
   isLast,
   isStreaming,
+  onSourceClick,
 }: {
   message: ChatMessage;
   isLast: boolean;
   isStreaming: boolean;
+  onSourceClick?: (source: SourceChunk) => void;
 }) {
   const isUser = message.role === "user";
   const showTyping = isLast && isStreaming && !message.content;
@@ -91,7 +95,7 @@ function MessageBubble({
           )}
         </div>
         {message.sourceChunks && message.sourceChunks.length > 0 && (
-          <SourceChips chunks={message.sourceChunks} />
+          <SourceChips chunks={message.sourceChunks} onSourceClick={onSourceClick} />
         )}
       </div>
       {isUser && (
@@ -103,7 +107,13 @@ function MessageBubble({
   );
 }
 
-function SourceChips({ chunks }: { chunks: SourceChunk[] }) {
+function SourceChips({
+  chunks,
+  onSourceClick,
+}: {
+  chunks: SourceChunk[];
+  onSourceClick?: (source: SourceChunk) => void;
+}) {
   // Deduplicate by filename + page
   const unique = new Map<string, SourceChunk>();
   for (const chunk of chunks) {
@@ -119,7 +129,16 @@ function SourceChips({ chunks }: { chunks: SourceChunk[] }) {
         <Badge
           key={`${chunk.chunk_id}`}
           variant="outline"
-          className="text-xs gap-1 font-normal"
+          className="text-xs gap-1 font-normal cursor-pointer hover:bg-accent"
+          role="button"
+          tabIndex={0}
+          onClick={() => onSourceClick?.(chunk)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSourceClick?.(chunk);
+            }
+          }}
         >
           <FileText className="h-3 w-3" />
           {chunk.filename}, p.{chunk.page_number}

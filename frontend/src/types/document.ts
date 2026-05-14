@@ -23,6 +23,28 @@ export interface DocumentStatus {
   chunk_count: number;
 }
 
+export interface Chunk {
+  id: string;
+  document_id: string;
+  chunk_index: number;
+  page_number: number;
+  content: string;
+  token_count: number;
+}
+
+export interface ChunkListResponse {
+  chunks: Chunk[];
+  total: number;
+  document_id: string;
+}
+
+export interface ChunkWithContext {
+  chunk: Chunk;
+  previous_chunk: Chunk | null;
+  next_chunk: Chunk | null;
+  document_filename: string;
+}
+
 export const PROCESSING_STATUSES = [
   "uploaded",
   "extracting",

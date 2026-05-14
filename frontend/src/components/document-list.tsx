@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
 import { FileText, FileIcon, Trash2, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DocumentListSkeleton } from "@/components/document-list-skeleton";
 import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import type { Document } from "@/types/document";
 import { isProcessing } from "@/types/document";
@@ -110,7 +113,12 @@ function DocumentCard({
           <FileTypeIcon type={doc.file_type} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="truncate font-medium text-sm">{doc.filename}</p>
+          <Link
+            href={`/documents/${doc.id}`}
+            className="truncate font-medium text-sm hover:underline"
+          >
+            {doc.filename}
+          </Link>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span>{formatBytes(doc.size_bytes)}</span>
             <span>{formatDate(doc.created_at)}</span>
@@ -149,17 +157,16 @@ export function DocumentList() {
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
+      toast.success("Document deleted");
+    } catch {
+      toast.error("Failed to delete document");
     } finally {
       setDeleteTarget(null);
     }
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <DocumentListSkeleton />;
   }
 
   if (error) {

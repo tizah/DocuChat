@@ -27,6 +27,16 @@ export function useDocuments() {
   });
 }
 
+export function useDocument(documentId: string) {
+  return useQuery<Document>({
+    queryKey: ["document", documentId],
+    queryFn: async () => {
+      const { data } = await api.get<Document>(`/documents/${documentId}`);
+      return data;
+    },
+  });
+}
+
 export function useDocumentStatus(documentId: string | null) {
   return useQuery<DocumentStatus>({
     queryKey: ["document-status", documentId],

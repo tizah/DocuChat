@@ -1,104 +1,96 @@
-import pytest
+"""Integration test for pgvector search.
 
-from app.services.vector_store import VectorStore
+Skipped on SQLite (default test dialect) because cosine_distance is a
+Postgres-only operator. To run, set DATABASE_URL to a Postgres instance
+with the pgvector extension installed.
+"""
+
+import uuid
+
+import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.chunk import Chunk
+from app.models.document import Document
+from app.services.vector_store import search_chunks
 
 
 @pytest.fixture
-def store(chroma_dir):
-    return VectorStore(persist_dir=chroma_dir)
+async def pg_session(db_session: AsyncSession):
+    if db_session.bind.dialect.name != "postgresql":
+        pytest.skip("pgvector search requires Postgres")
+    # Ensure extension is available on the test DB
+    await db_session.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    return db_session
 
 
-def test_add_and_search(store: VectorStore):
-    """Test basic insert and retrieval."""
-    embeddings = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-    store.add(
-        ids=["c1", "c2", "c3"],
-        embeddings=embeddings,
-        documents=["chunk about cats", "chunk about dogs", "chunk about birds"],
-        metadatas=[
-            {"document_id": "doc1", "chunk_index": 0, "page_number": 1},
-            {"document_id": "doc1", "chunk_index": 1, "page_number": 1},
-            {"document_id": "doc2", "chunk_index": 0, "page_number": 1},
-        ],
+async def test_search_orders_by_similarity_and_filters(pg_session: AsyncSession):
+    doc_a = Document(
+        id=str(uuid.uuid4()), filename="a.pdf", file_type="pdf", size_bytes=1, status="ready"
     )
-
-    # Search with query close to first embedding
-    results = store.search(
-        query_embedding=[0.9, 0.1, 0.0],
-        document_ids=["doc1", "doc2"],
-        top_k=2,
+    doc_b = Document(
+        id=str(uuid.uuid4()), filename="b.pdf", file_type="pdf", size_bytes=1, status="ready"
     )
-    assert len(results) == 2
-    assert results[0].chunk_id == "c1"
-    assert results[0].score > 0.5
+    pg_session.add_all([doc_a, doc_b])
+    await pg_session.flush()
 
+    # Pad embeddings to the configured dim
+    from app.config import settings
 
-def test_search_with_document_filter(store: VectorStore):
-    """Search should respect document_id filtering."""
-    store.add(
-        ids=["c1", "c2"],
-        embeddings=[[1.0, 0.0], [0.0, 1.0]],
-        documents=["doc1 content", "doc2 content"],
-        metadatas=[
-            {"document_id": "doc1", "chunk_index": 0, "page_number": 1},
-            {"document_id": "doc2", "chunk_index": 0, "page_number": 1},
-        ],
-    )
+    def pad(v: list[float]) -> list[float]:
+        return v + [0.0] * (settings.embedding_dimensions - len(v))
 
-    # Filter to doc2 only — should return doc2 even though query is closer to doc1
-    results = store.search(
-        query_embedding=[0.9, 0.1],
-        document_ids=["doc2"],
+    chunks = [
+        Chunk(
+            document_id=doc_a.id, chunk_index=0, page_number=1,
+            content="cats", token_count=1, embedding=pad([1.0, 0.0, 0.0]),
+        ),
+        Chunk(
+            document_id=doc_a.id, chunk_index=1, page_number=1,
+            content="dogs", token_count=1, embedding=pad([0.0, 1.0, 0.0]),
+        ),
+        Chunk(
+            document_id=doc_b.id, chunk_index=0, page_number=1,
+            content="birds", token_count=1, embedding=pad([0.0, 0.0, 1.0]),
+        ),
+    ]
+    pg_session.add_all(chunks)
+    await pg_session.flush()
+
+    # Query close to first chunk; restrict to doc_a only
+    results = await search_chunks(
+        db=pg_session,
+        query_embedding=pad([0.9, 0.1, 0.0]),
+        document_ids=[doc_a.id],
         top_k=5,
     )
-    assert len(results) == 1
-    assert results[0].document_id == "doc2"
+    assert [r.content for r in results] == ["cats", "dogs"]
+    assert all(r.document_id == doc_a.id for r in results)
+    assert results[0].score > results[1].score
 
 
-def test_delete_by_document(store: VectorStore):
-    """Deleting by document_id should remove all its chunks."""
-    store.add(
-        ids=["c1", "c2", "c3"],
-        embeddings=[[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]],
-        documents=["a", "b", "c"],
-        metadatas=[
-            {"document_id": "doc1", "chunk_index": 0, "page_number": 1},
-            {"document_id": "doc1", "chunk_index": 1, "page_number": 1},
-            {"document_id": "doc2", "chunk_index": 0, "page_number": 1},
-        ],
+async def test_search_skips_chunks_without_embeddings(pg_session: AsyncSession):
+    doc = Document(
+        id=str(uuid.uuid4()), filename="x.pdf", file_type="pdf", size_bytes=1, status="ready"
     )
+    pg_session.add(doc)
+    await pg_session.flush()
 
-    store.delete_by_document("doc1")
+    from app.config import settings
 
-    # Only doc2 chunk should remain
-    results = store.search(
-        query_embedding=[0.5, 0.5],
-        document_ids=["doc1", "doc2"],
-        top_k=10,
+    pg_session.add(
+        Chunk(
+            document_id=doc.id, chunk_index=0, page_number=1,
+            content="no-vec", token_count=1, embedding=None,
+        ),
     )
-    assert len(results) == 1
-    assert results[0].document_id == "doc2"
+    await pg_session.flush()
 
-
-def test_search_returns_metadata(store: VectorStore):
-    """Verify search results include all metadata fields."""
-    store.add(
-        ids=["c1"],
-        embeddings=[[1.0, 0.0]],
-        documents=["test content"],
-        metadatas=[{"document_id": "doc1", "chunk_index": 3, "page_number": 5}],
+    results = await search_chunks(
+        db=pg_session,
+        query_embedding=[0.1] * settings.embedding_dimensions,
+        document_ids=[doc.id],
+        top_k=5,
     )
-
-    results = store.search(
-        query_embedding=[1.0, 0.0],
-        document_ids=["doc1"],
-        top_k=1,
-    )
-    assert len(results) == 1
-    r = results[0]
-    assert r.chunk_id == "c1"
-    assert r.document_id == "doc1"
-    assert r.chunk_index == 3
-    assert r.page_number == 5
-    assert r.content == "test content"
-    assert r.score > 0
+    assert results == []

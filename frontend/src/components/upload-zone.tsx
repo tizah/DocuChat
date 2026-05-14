@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useUploadDocument } from "@/hooks/use-documents";
@@ -33,10 +34,12 @@ export function UploadZone() {
           onProgress: setProgress,
         });
         setProgress(null);
+        toast.success("Document uploaded successfully");
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Upload failed. Please try again.";
         setError(message);
+        toast.error(message);
         setProgress(null);
       }
     },

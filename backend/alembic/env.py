@@ -4,10 +4,12 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
+from app.config import settings
 from app.database import Base
 from app.models.chunk import Chunk  # noqa: F401
 from app.models.conversation import Conversation, Message  # noqa: F401
 from app.models.document import Document  # noqa: F401
+from app.models.user import RefreshToken, User  # noqa: F401
 
 config = context.config
 
@@ -15,6 +17,20 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+
+def _sync_db_url(url: str) -> str:
+    """Convert an async SQLAlchemy URL into the sync equivalent for Alembic.
+
+    Alembic runs synchronously, so it can't use aiosqlite/asyncpg. We rewrite
+    the dialect prefix and let SQLAlchemy pick a sync driver (sqlite stdlib,
+    psycopg). For Postgres migrations, install psycopg: `pip install psycopg[binary]`.
+    """
+    return url.replace("+aiosqlite", "").replace("+asyncpg", "+psycopg")
+
+
+# Use DATABASE_URL from app settings instead of the hardcoded value in alembic.ini.
+config.set_main_option("sqlalchemy.url", _sync_db_url(settings.database_url))
 
 
 def run_migrations_offline() -> None:

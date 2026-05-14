@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileText, MessageSquare } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/user-menu";
 
 const navItems = [
   { href: "/documents", label: "Documents", icon: FileText },
@@ -43,6 +45,10 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="border-t border-border p-2">
+        <ThemeToggle />
+      </div>
+      <UserMenu />
     </aside>
   );
 }

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.document import Document
 from app.services.embedder import get_embedding_provider
 from app.services.llm import get_llm_provider
-from app.services.vector_store import SearchResult, VectorStore
+from app.services.vector_store import SearchResult, search_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -95,17 +95,18 @@ def stream_rag_response(
     yield from llm.stream_chat(system_prompt, messages)
 
 
-def retrieve_chunks(
+async def retrieve_chunks(
+    db: AsyncSession,
     query: str,
     document_ids: list[str],
     top_k: int = 5,
 ) -> list[SearchResult]:
-    """Embed the query and retrieve relevant chunks from the vector store."""
+    """Embed the query and retrieve relevant chunks via pgvector."""
     embedder = get_embedding_provider()
     query_embedding = embedder.embed_query(query)
 
-    vector_store = VectorStore()
-    return vector_store.search(
+    return await search_chunks(
+        db=db,
         query_embedding=query_embedding,
         document_ids=document_ids,
         top_k=top_k,
