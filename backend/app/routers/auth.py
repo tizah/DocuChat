@@ -61,8 +61,8 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
         path="/",
         max_age=settings.access_token_expire_minutes * 60,
     )
@@ -70,16 +70,27 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
         path="/api/auth",
         max_age=settings.refresh_token_expire_days * 86400,
     )
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/api/auth")
+    # Browsers only honor delete-cookie when samesite/secure match the original Set-Cookie.
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        path="/api/auth",
+        samesite=settings.cookie_samesite,
+        secure=settings.cookie_secure,
+    )
 
 
 # --- Routes ---

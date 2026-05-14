@@ -1,8 +1,6 @@
 import asyncio
 import logging
-import os
 import uuid
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, UploadFile
@@ -22,7 +20,7 @@ from app.schemas import (
     DocumentStatusResponse,
 )
 from app.services.pipeline import process_document
-from app.services.vector_store import VectorStore
+from app.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +34,13 @@ ALLOWED_MIME_TYPES = {
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
-async def _run_pipeline_background(doc_id: str, file_path: str, file_ext: str) -> None:
+async def _run_pipeline_background(doc_id: str, storage_key: str, file_ext: str) -> None:
     """Wrapper to run the pipeline in background, catching exceptions."""
     from app.database import async_session
 
     try:
         async with async_session() as db:
-            await process_document(doc_id, file_path, file_ext, db)
+            await process_document(doc_id, storage_key, file_ext, db)
             await db.commit()
     except Exception:
         logger.exception("Background pipeline failed for document %s", doc_id)
@@ -64,15 +62,12 @@ async def upload_document(file: UploadFile, db: DbSession, current_user: Current
             code="FILE_TOO_LARGE",
         )
 
-    upload_dir = Path(settings.upload_dir)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
     doc_id = str(uuid.uuid4())
     file_ext = ALLOWED_MIME_TYPES[file.content_type]
-    file_path = upload_dir / f"{doc_id}.{file_ext}"
+    storage_key = f"{doc_id}.{file_ext}"
 
-    with open(file_path, "wb") as f:
-        f.write(content)
+    # S3/R2 PutObject is blocking; offload so it doesn't stall the event loop.
+    await asyncio.to_thread(get_storage().save, storage_key, content)
 
     document = Document(
         id=doc_id,
@@ -88,7 +83,7 @@ async def upload_document(file: UploadFile, db: DbSession, current_user: Current
     await db.refresh(document)
 
     # Run pipeline in background so upload returns immediately
-    asyncio.create_task(_run_pipeline_background(doc_id, str(file_path), file_ext))
+    asyncio.create_task(_run_pipeline_background(doc_id, storage_key, file_ext))
 
     return document
 
@@ -175,24 +170,12 @@ async def delete_document(document_id: str, db: DbSession, current_user: Current
     if not document:
         raise NotFoundError("Document not found")
 
-    # Delete chunks from database
-    chunk_result = await db.execute(
-        select(Chunk).where(Chunk.document_id == document_id)
-    )
-    for chunk in chunk_result.scalars().all():
-        await db.delete(chunk)
+    # Chunks (and their embeddings) cascade with the document via ON DELETE CASCADE.
 
-    # Delete from vector store
+    # Delete file from storage (best-effort — don't block the row delete on this)
     try:
-        vector_store = VectorStore()
-        vector_store.delete_by_document(document_id)
+        get_storage().delete(f"{document.id}.{document.file_type}")
     except Exception:
-        pass  # Vector store cleanup is best-effort
-
-    # Delete file from disk
-    upload_dir = Path(settings.upload_dir)
-    file_path = upload_dir / f"{document.id}.{document.file_type}"
-    if file_path.exists():
-        os.remove(file_path)
+        logger.warning("Storage delete failed for document %s", document.id, exc_info=True)
 
     await db.delete(document)

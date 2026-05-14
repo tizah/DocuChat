@@ -8,14 +8,14 @@ from app.models.document import Document
 from app.services.chunker import chunk_pages
 from app.services.embedder import get_embedding_provider
 from app.services.extractor import extract_text
-from app.services.vector_store import VectorStore
+from app.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
 
 async def process_document(
     document_id: str,
-    file_path: str,
+    storage_key: str,
     file_type: str,
     db: AsyncSession,
 ) -> None:
@@ -37,7 +37,8 @@ async def process_document(
         document.status = "extracting"
         await db.flush()
 
-        pages = extract_text(file_path, file_type)
+        file_data = get_storage().read(storage_key)
+        pages = extract_text(file_data, file_type)
         document.page_count = len(pages)
         logger.info("Extraction complete for document %s: %d pages", document_id, len(pages))
 
@@ -68,30 +69,18 @@ async def process_document(
             db_chunks.append(db_chunk)
         await db.flush()
 
-        # Stage 3: Embed
+        # Stage 3: Embed — write vectors back onto each chunk row.
+        # pgvector indexes the column; no separate store to keep in sync.
         document.status = "embedding"
         await db.flush()
 
         provider = get_embedding_provider()
         texts = [c.content for c in chunks]
         embeddings = provider.embed(texts)
+        for db_chunk, vec in zip(db_chunks, embeddings, strict=True):
+            db_chunk.embedding = vec
+        await db.flush()
         logger.info("Embedding complete for document %s", document_id)
-
-        # Stage 4: Store in vector store
-        vector_store = VectorStore()
-        vector_store.add(
-            ids=[c.id for c in db_chunks],
-            embeddings=embeddings,
-            documents=texts,
-            metadatas=[
-                {
-                    "document_id": chunk.document_id,
-                    "chunk_index": chunk.chunk_index,
-                    "page_number": chunk.page_number,
-                }
-                for chunk in chunks
-            ],
-        )
 
         document.status = "ready"
         await db.flush()

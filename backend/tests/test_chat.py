@@ -1,6 +1,6 @@
 """Tests for chat endpoint and RAG pipeline."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -115,7 +115,11 @@ async def test_chat_creates_conversation(client: AsyncClient, ready_document):
         yield "world!"
 
     with (
-        patch("app.routers.chat.retrieve_chunks", return_value=mock_results),
+        patch(
+            "app.routers.chat.retrieve_chunks",
+            new_callable=AsyncMock,
+            return_value=mock_results,
+        ),
         patch("app.routers.chat.stream_rag_response", side_effect=mock_stream),
     ):
         resp = await client.post(
@@ -155,7 +159,11 @@ async def test_chat_with_existing_conversation(
         yield "Response."
 
     with (
-        patch("app.routers.chat.retrieve_chunks", return_value=mock_results),
+        patch(
+            "app.routers.chat.retrieve_chunks",
+            new_callable=AsyncMock,
+            return_value=mock_results,
+        ),
         patch("app.routers.chat.stream_rag_response", side_effect=mock_stream),
     ):
         resp = await client.post(

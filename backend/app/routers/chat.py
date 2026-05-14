@@ -80,7 +80,8 @@ async def chat(request: ChatRequest, db: DbSession, current_user: CurrentUser):
     await db.flush()
 
     # Retrieve relevant chunks
-    search_results = retrieve_chunks(
+    search_results = await retrieve_chunks(
+        db=db,
         query=request.message,
         document_ids=request.document_ids,
     )

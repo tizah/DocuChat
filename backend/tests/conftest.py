@@ -134,12 +134,3 @@ async def conversation_with_messages(db_session, client):
     return conv
 
 
-@pytest.fixture
-def chroma_dir(tmp_path):
-    """Provide a temp ChromaDB directory and patch settings."""
-    from app.config import settings
-
-    original = settings.chroma_persist_dir
-    settings.chroma_persist_dir = str(tmp_path / "chroma")
-    yield settings.chroma_persist_dir
-    settings.chroma_persist_dir = original

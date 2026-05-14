@@ -1,3 +1,4 @@
+import io
 from dataclasses import dataclass
 
 import docx
@@ -10,26 +11,26 @@ class PageContent:
     content: str
 
 
-def extract_text(file_path: str, file_type: str) -> list[PageContent]:
-    """Extract text from a document file.
+def extract_text(file_data: bytes, file_type: str) -> list[PageContent]:
+    """Extract text from document bytes.
 
     Args:
-        file_path: Path to the document file.
+        file_data: Raw bytes of the document.
         file_type: File extension ("pdf" or "docx").
 
     Returns:
         List of PageContent with page numbers and text content.
     """
     if file_type == "pdf":
-        return _extract_pdf(file_path)
+        return _extract_pdf(file_data)
     elif file_type == "docx":
-        return _extract_docx(file_path)
+        return _extract_docx(file_data)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
 
-def _extract_pdf(file_path: str) -> list[PageContent]:
-    reader = PdfReader(file_path)
+def _extract_pdf(file_data: bytes) -> list[PageContent]:
+    reader = PdfReader(io.BytesIO(file_data))
     pages: list[PageContent] = []
 
     for i, page in enumerate(reader.pages):
@@ -41,8 +42,8 @@ def _extract_pdf(file_path: str) -> list[PageContent]:
     return pages
 
 
-def _extract_docx(file_path: str) -> list[PageContent]:
-    doc = docx.Document(file_path)
+def _extract_docx(file_data: bytes) -> list[PageContent]:
+    doc = docx.Document(io.BytesIO(file_data))
     paragraphs: list[str] = []
 
     for para in doc.paragraphs:
