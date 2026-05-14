@@ -1,3 +1,4 @@
+import os
 from typing import Literal
 
 from pydantic_settings import BaseSettings
@@ -7,23 +8,23 @@ class Settings(BaseSettings):
     app_name: str = "DocuChat"
     app_version: str = "0.1.0"
     debug: bool = False
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     # Comma-separated additional CORS origins, e.g. "https://docuchat.vercel.app,https://preview.example.com"
     extra_cors_origins: str = ""
-    backend_port: int = 8000
+    backend_port: int = int(os.getenv("BACKEND_PORT", "8000"))
 
     # Cookies — for cross-origin prod (Vercel ↔ Render) set BOTH:
     #   cookie_secure=true, cookie_samesite=none
     # Browsers reject SameSite=None unless Secure is also set.
     cookie_secure: bool = False
     cookie_samesite: Literal["lax", "strict", "none"] = "lax"
-    database_url: str = "sqlite+aiosqlite:///./docuchat.db"
+    database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./docuchat.db")
     upload_dir: str = "./uploads"
     max_upload_size: int = 20 * 1024 * 1024  # 20MB
 
     # Storage backend: "local" (uses upload_dir) or "s3" (R2-compatible).
     storage_backend: Literal["local", "s3"] = "local"
-    s3_bucket: str = ""
+    s3_bucket: str = os.getenv("S3_BUCKET", "")
     s3_endpoint_url: str | None = None  # R2: https://<account>.r2.cloudflarestorage.com
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
 
     # Embedding
     embedding_provider: str = "openai"
-    openai_api_key: str | None = None
+    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
 
