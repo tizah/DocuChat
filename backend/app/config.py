@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Embedding
     embedding_provider: str = "openai"
-    openai_api_key: str | None = "REDACTED_OPENAI_KEY"
+    openai_api_key: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
 
