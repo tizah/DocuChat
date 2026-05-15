@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -13,11 +14,11 @@ BATCH_SIZE = 100
 
 class EmbeddingProvider(ABC):
     @abstractmethod
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed a list of texts and return their vector representations."""
 
     @abstractmethod
-    def embed_query(self, text: str) -> list[float]:
+    async def embed_query(self, text: str) -> list[float]:
         """Embed a single query text."""
 
 
@@ -37,7 +38,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         response = self.client.embeddings.create(input=texts, model=self.model)
         return [item.embedding for item in response.data]
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def _embed_sync(self, texts: list[str]) -> list[list[float]]:
         all_embeddings: list[list[float]] = []
         for i in range(0, len(texts), BATCH_SIZE):
             batch = texts[i : i + BATCH_SIZE]
@@ -46,8 +47,12 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
             all_embeddings.extend(embeddings)
         return all_embeddings
 
-    def embed_query(self, text: str) -> list[float]:
-        return self._call_api([text])[0]
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return await asyncio.to_thread(self._embed_sync, texts)
+
+    async def embed_query(self, text: str) -> list[float]:
+        result = await asyncio.to_thread(self._call_api, [text])
+        return result[0]
 
 
 @lru_cache(maxsize=1)

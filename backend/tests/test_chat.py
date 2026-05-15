@@ -110,7 +110,7 @@ async def test_chat_creates_conversation(client: AsyncClient, ready_document):
         ),
     ]
 
-    def mock_stream(*args, **kwargs):
+    async def mock_stream(*args, **kwargs):
         yield "Hello "
         yield "world!"
 
@@ -155,7 +155,7 @@ async def test_chat_with_existing_conversation(
         ),
     ]
 
-    def mock_stream(*args, **kwargs):
+    async def mock_stream(*args, **kwargs):
         yield "Response."
 
     with (

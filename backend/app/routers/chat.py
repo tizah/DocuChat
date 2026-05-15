@@ -138,7 +138,7 @@ async def chat(request: ChatRequest, db: DbSession, current_user: CurrentUser):
                 }),
             }
 
-            for token in stream_rag_response(
+            async for token in stream_rag_response(
                 query=request.message,
                 search_results=search_results,
                 filename_map=filename_map,
