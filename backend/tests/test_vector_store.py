@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import Chunk
 from app.models.document import Document
+from app.models.user import User
+from app.services.auth import hash_password
 from app.services.vector_store import search_chunks
 
 
@@ -25,12 +27,23 @@ async def pg_session(db_session: AsyncSession):
     return db_session
 
 
-async def test_search_orders_by_similarity_and_filters(pg_session: AsyncSession):
+@pytest.fixture
+async def owner(pg_session: AsyncSession) -> User:
+    """Document.user_id is NOT NULL — every test doc needs an owner."""
+    u = User(email=f"owner-{uuid.uuid4()}@test", hashed_password=hash_password("x"), name="O")
+    pg_session.add(u)
+    await pg_session.flush()
+    return u
+
+
+async def test_search_orders_by_similarity_and_filters(pg_session: AsyncSession, owner: User):
     doc_a = Document(
-        id=str(uuid.uuid4()), filename="a.pdf", file_type="pdf", size_bytes=1, status="ready"
+        id=str(uuid.uuid4()), user_id=owner.id, filename="a.pdf",
+        file_type="pdf", size_bytes=1, status="ready",
     )
     doc_b = Document(
-        id=str(uuid.uuid4()), filename="b.pdf", file_type="pdf", size_bytes=1, status="ready"
+        id=str(uuid.uuid4()), user_id=owner.id, filename="b.pdf",
+        file_type="pdf", size_bytes=1, status="ready",
     )
     pg_session.add_all([doc_a, doc_b])
     await pg_session.flush()
@@ -70,9 +83,10 @@ async def test_search_orders_by_similarity_and_filters(pg_session: AsyncSession)
     assert results[0].score > results[1].score
 
 
-async def test_search_skips_chunks_without_embeddings(pg_session: AsyncSession):
+async def test_search_skips_chunks_without_embeddings(pg_session: AsyncSession, owner: User):
     doc = Document(
-        id=str(uuid.uuid4()), filename="x.pdf", file_type="pdf", size_bytes=1, status="ready"
+        id=str(uuid.uuid4()), user_id=owner.id, filename="x.pdf",
+        file_type="pdf", size_bytes=1, status="ready",
     )
     pg_session.add(doc)
     await pg_session.flush()

@@ -8,6 +8,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-not-for-production")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncSession,
     async_sessionmaker,
@@ -22,16 +23,26 @@ TEST_USER_EMAIL = "test@example.com"
 TEST_USER_PASSWORD = "testpassword123"
 TEST_USER_NAME = "Test User"
 
+# Set TEST_DATABASE_URL to point at a Postgres+pgvector instance to exercise the
+# vector-search tests; otherwise we fall back to a per-test SQLite tempfile.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
 
 @pytest.fixture
 async def db_session():
     """Create an isolated test database for each test."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        db_path = tmp.name
-    db_url = f"sqlite+aiosqlite:///{db_path}"
+    if TEST_DATABASE_URL:
+        db_url = TEST_DATABASE_URL
+        db_path = None
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+        db_url = f"sqlite+aiosqlite:///{db_path}"
 
     engine = create_async_engine(db_url)
     async with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -42,7 +53,8 @@ async def db_session():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
-    os.unlink(db_path)
+    if db_path is not None:
+        os.unlink(db_path)
 
 
 @pytest.fixture
