@@ -2,13 +2,21 @@ import os
 import tempfile
 from unittest.mock import AsyncMock, patch
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+# Must precede any `from app...` import — app.config's validator refuses to load
+# with the default JWT secret unless DEBUG=true.
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-secret-not-for-production")
 
-from app.database import Base, get_db
-from app.main import app
-from app.models.conversation import Conversation, Message
+import pytest  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models.conversation import Conversation, Message  # noqa: E402
 
 TEST_USER_EMAIL = "test@example.com"
 TEST_USER_PASSWORD = "testpassword123"

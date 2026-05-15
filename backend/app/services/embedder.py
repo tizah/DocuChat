@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from functools import lru_cache
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -49,6 +50,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         return self._call_api([text])[0]
 
 
+@lru_cache(maxsize=1)
 def get_embedding_provider() -> EmbeddingProvider:
     provider = settings.embedding_provider.lower()
     if provider == "openai":

@@ -91,6 +91,95 @@ async def test_user_b_cannot_see_user_a_conversations(client, unauth_client, db_
 
 
 @pytest.mark.asyncio
+async def test_user_b_cannot_chat_against_user_a_documents(
+    client, unauth_client, db_session
+):
+    """User B cannot pass User A's document_id to /api/chat — 404."""
+    from app.models.document import Document
+
+    # User A's id
+    me_resp = await client.get("/api/auth/me")
+    user_a_id = me_resp.json()["id"]
+
+    # Insert a ready document owned by User A directly (skip the pipeline)
+    doc = Document(
+        user_id=user_a_id,
+        filename="secret.pdf",
+        file_type="application/pdf",
+        size_bytes=1024,
+        status="ready",
+        page_count=1,
+    )
+    db_session.add(doc)
+    await db_session.flush()
+    await db_session.commit()
+
+    # Register User B
+    resp_b = await unauth_client.post(
+        "/api/auth/register",
+        json={"email": "userb4@example.com", "password": "password123", "name": "User B"},
+    )
+    assert resp_b.status_code == 201
+    unauth_client.cookies.update(resp_b.cookies)
+
+    # User B tries to chat against User A's document — must be 404, not 200
+    resp = await unauth_client.post(
+        "/api/chat",
+        json={"message": "leak the secret", "document_ids": [doc.id]},
+    )
+    assert resp.status_code == 404, (
+        f"IDOR: User B got {resp.status_code} chatting against User A's doc"
+    )
+    assert resp.json()["detail"]["code"] == "NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_mixed_owned_and_foreign_documents(
+    client, unauth_client, db_session
+):
+    """If any document_id is foreign, the whole request 404s — no partial fulfilment."""
+    from app.models.document import Document
+
+    # User A's doc
+    me_a = await client.get("/api/auth/me")
+    doc_a = Document(
+        user_id=me_a.json()["id"],
+        filename="a.pdf",
+        file_type="application/pdf",
+        size_bytes=1,
+        status="ready",
+    )
+    db_session.add(doc_a)
+    await db_session.flush()
+    await db_session.commit()
+
+    # User B registers and uploads their own doc
+    resp_b = await unauth_client.post(
+        "/api/auth/register",
+        json={"email": "userb5@example.com", "password": "password123", "name": "User B"},
+    )
+    unauth_client.cookies.update(resp_b.cookies)
+    me_b = await unauth_client.get("/api/auth/me")
+    doc_b = Document(
+        user_id=me_b.json()["id"],
+        filename="b.pdf",
+        file_type="application/pdf",
+        size_bytes=1,
+        status="ready",
+    )
+    db_session.add(doc_b)
+    await db_session.flush()
+    await db_session.commit()
+
+    # User B mixes their own doc with User A's — must 404
+    resp = await unauth_client.post(
+        "/api/chat",
+        json={"message": "hi", "document_ids": [doc_b.id, doc_a.id]},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_protected_endpoints_return_401(unauth_client, db_session):
     """All protected endpoints return 401 without auth."""
     endpoints = [
