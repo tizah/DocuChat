@@ -93,6 +93,7 @@ def test_embed_exhausted_retries(mock_openai_class):
 
 
 def test_get_embedding_provider_openai():
+    get_embedding_provider.cache_clear()
     with patch("app.services.embedder.settings") as mock_settings:
         mock_settings.embedding_provider = "openai"
         mock_settings.openai_api_key = "test-key"
@@ -100,10 +101,13 @@ def test_get_embedding_provider_openai():
         with patch("openai.OpenAI"):
             provider = get_embedding_provider()
             assert isinstance(provider, OpenAIEmbeddingProvider)
+    get_embedding_provider.cache_clear()
 
 
 def test_get_embedding_provider_unknown():
+    get_embedding_provider.cache_clear()
     with patch("app.services.embedder.settings") as mock_settings:
         mock_settings.embedding_provider = "unknown"
         with pytest.raises(ValueError, match="Unknown embedding provider"):
             get_embedding_provider()
+    get_embedding_provider.cache_clear()

@@ -196,36 +196,42 @@ async def test_chat_conversation_not_found(client: AsyncClient, ready_document):
 
 
 def test_get_llm_provider_openai():
+    from app.services.llm import get_llm_provider
+
+    get_llm_provider.cache_clear()
     with patch("app.services.llm.settings") as mock_settings:
         mock_settings.llm_provider = "openai"
         mock_settings.openai_api_key = "test-key"
         mock_settings.openai_chat_model = "gpt-4o-mini"
         with patch("openai.OpenAI"):
-            from app.services.llm import get_llm_provider
-
             provider = get_llm_provider()
             assert provider.__class__.__name__ == "OpenAILLMProvider"
+    get_llm_provider.cache_clear()
 
 
 def test_get_llm_provider_anthropic():
+    from app.services.llm import get_llm_provider
+
+    get_llm_provider.cache_clear()
     with patch("app.services.llm.settings") as mock_settings:
         mock_settings.llm_provider = "anthropic"
         mock_settings.anthropic_api_key = "test-key"
         mock_settings.anthropic_chat_model = "claude-sonnet-4-20250514"
         with patch("anthropic.Anthropic"):
-            from app.services.llm import get_llm_provider
-
             provider = get_llm_provider()
             assert provider.__class__.__name__ == "AnthropicLLMProvider"
+    get_llm_provider.cache_clear()
 
 
 def test_get_llm_provider_unknown():
+    from app.services.llm import get_llm_provider
+
+    get_llm_provider.cache_clear()
     with patch("app.services.llm.settings") as mock_settings:
         mock_settings.llm_provider = "unknown"
-        from app.services.llm import get_llm_provider
-
         with pytest.raises(ValueError, match="Unknown LLM provider"):
             get_llm_provider()
+    get_llm_provider.cache_clear()
 
 
 # --- Helper ---

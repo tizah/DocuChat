@@ -14,6 +14,7 @@ from app.database import get_db
 from app.dependencies import CurrentUser
 from app.exceptions import NotFoundError, ValidationError
 from app.models.conversation import Conversation, Message
+from app.models.document import Document
 from app.services.rag import (
     build_context,
     get_filename_map,
@@ -43,8 +44,21 @@ async def chat(request: ChatRequest, db: DbSession, current_user: CurrentUser):
             code="NO_DOCUMENTS",
         )
 
-    # Rate limit check
+    # Rate limit before any DB work — a throttled caller shouldn't be able to
+    # probe document existence via timing or response codes.
     chat_rate_limiter.check(current_user.id)
+
+    # IDOR guard: every requested document_id must belong to the caller. A single
+    # foreign id => 404 (don't leak whether it exists in another tenant).
+    owned_result = await db.execute(
+        select(Document.id).where(
+            Document.id.in_(request.document_ids),
+            Document.user_id == current_user.id,
+        )
+    )
+    owned_ids = {row[0] for row in owned_result.all()}
+    if owned_ids != set(request.document_ids):
+        raise NotFoundError("Document not found")
 
     # Get or create conversation
     conversation: Conversation

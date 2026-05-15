@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Generator
+from functools import lru_cache
 
 from app.config import settings
 
@@ -55,6 +56,7 @@ class AnthropicLLMProvider(LLMProvider):
             yield from stream.text_stream
 
 
+@lru_cache(maxsize=1)
 def get_llm_provider() -> LLMProvider:
     provider = settings.llm_provider.lower()
     if provider == "openai":

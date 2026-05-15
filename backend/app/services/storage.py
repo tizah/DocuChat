@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
@@ -81,6 +82,7 @@ class S3Storage(StorageBackend):
             logger.warning("S3 delete failed for key %s", key, exc_info=True)
 
 
+@lru_cache(maxsize=1)
 def get_storage() -> StorageBackend:
     backend = settings.storage_backend.lower()
     if backend == "local":
