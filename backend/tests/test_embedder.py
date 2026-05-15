@@ -15,13 +15,13 @@ def _make_mock_response(n: int, dims: int = 1536):
 
 
 @patch("openai.OpenAI")
-def test_embed_single_text(mock_openai_class):
+async def test_embed_single_text(mock_openai_class):
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
     mock_client.embeddings.create.return_value = _make_mock_response(1)
 
     provider = OpenAIEmbeddingProvider()
-    result = provider.embed(["hello world"])
+    result = await provider.embed(["hello world"])
 
     assert len(result) == 1
     assert len(result[0]) == 1536
@@ -29,7 +29,7 @@ def test_embed_single_text(mock_openai_class):
 
 
 @patch("openai.OpenAI")
-def test_embed_batch_processing(mock_openai_class):
+async def test_embed_batch_processing(mock_openai_class):
     """Verify texts are processed in batches of BATCH_SIZE."""
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
@@ -43,26 +43,26 @@ def test_embed_batch_processing(mock_openai_class):
     ]
 
     provider = OpenAIEmbeddingProvider()
-    result = provider.embed(texts)
+    result = await provider.embed(texts)
 
     assert len(result) == n_texts
     assert mock_client.embeddings.create.call_count == 2
 
 
 @patch("openai.OpenAI")
-def test_embed_query(mock_openai_class):
+async def test_embed_query(mock_openai_class):
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
     mock_client.embeddings.create.return_value = _make_mock_response(1)
 
     provider = OpenAIEmbeddingProvider()
-    result = provider.embed_query("test query")
+    result = await provider.embed_query("test query")
 
     assert len(result) == 1536
 
 
 @patch("openai.OpenAI")
-def test_embed_retry_on_failure(mock_openai_class):
+async def test_embed_retry_on_failure(mock_openai_class):
     """Verify retry logic on transient failures."""
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
@@ -74,14 +74,14 @@ def test_embed_retry_on_failure(mock_openai_class):
     ]
 
     provider = OpenAIEmbeddingProvider()
-    result = provider.embed(["hello"])
+    result = await provider.embed(["hello"])
 
     assert len(result) == 1
     assert mock_client.embeddings.create.call_count == 3
 
 
 @patch("openai.OpenAI")
-def test_embed_exhausted_retries(mock_openai_class):
+async def test_embed_exhausted_retries(mock_openai_class):
     """After 3 failures, the error should propagate."""
     mock_client = MagicMock()
     mock_openai_class.return_value = mock_client
@@ -89,7 +89,7 @@ def test_embed_exhausted_retries(mock_openai_class):
 
     provider = OpenAIEmbeddingProvider()
     with pytest.raises(ConnectionError):
-        provider.embed(["hello"])
+        await provider.embed(["hello"])
 
 
 def test_get_embedding_provider_openai():

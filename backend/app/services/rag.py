@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Generator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -76,12 +76,12 @@ async def get_filename_map(
     return {doc.id: doc.filename for doc in result.scalars().all()}
 
 
-def stream_rag_response(
+async def stream_rag_response(
     query: str,
     search_results: list[SearchResult],
     filename_map: dict[str, str],
     conversation_history: list[dict[str, str]] | None = None,
-) -> Generator[str, None, None]:
+) -> AsyncIterator[str]:
     """Stream a RAG response from the LLM."""
     context, _source_chunks = build_context(search_results, filename_map)
     system_prompt = SYSTEM_PROMPT.format(context=context)
@@ -92,7 +92,8 @@ def stream_rag_response(
     messages.append({"role": "user", "content": query})
 
     llm = get_llm_provider()
-    yield from llm.stream_chat(system_prompt, messages)
+    async for token in llm.stream_chat(system_prompt, messages):
+        yield token
 
 
 async def retrieve_chunks(
@@ -103,7 +104,7 @@ async def retrieve_chunks(
 ) -> list[SearchResult]:
     """Embed the query and retrieve relevant chunks via pgvector."""
     embedder = get_embedding_provider()
-    query_embedding = embedder.embed_query(query)
+    query_embedding = await embedder.embed_query(query)
 
     return await search_chunks(
         db=db,

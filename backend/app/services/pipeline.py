@@ -76,7 +76,7 @@ async def process_document(
 
         provider = get_embedding_provider()
         texts = [c.content for c in chunks]
-        embeddings = provider.embed(texts)
+        embeddings = await provider.embed(texts)
         for db_chunk, vec in zip(db_chunks, embeddings, strict=True):
             db_chunk.embedding = vec
         await db.flush()

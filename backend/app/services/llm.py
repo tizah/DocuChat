@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import AsyncIterator
 from functools import lru_cache
 
 from app.config import settings
@@ -12,48 +12,49 @@ class LLMProvider(ABC):
     @abstractmethod
     def stream_chat(
         self, system_prompt: str, messages: list[dict[str, str]]
-    ) -> Generator[str, None, None]:
-        """Stream chat completion tokens."""
+    ) -> AsyncIterator[str]:
+        """Stream chat completion tokens as an async iterator."""
 
 
 class OpenAILLMProvider(LLMProvider):
     def __init__(self) -> None:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
 
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
         self.model = settings.openai_chat_model
 
-    def stream_chat(
+    async def stream_chat(
         self, system_prompt: str, messages: list[dict[str, str]]
-    ) -> Generator[str, None, None]:
+    ) -> AsyncIterator[str]:
         full_messages = [{"role": "system", "content": system_prompt}, *messages]
-        stream = self.client.chat.completions.create(
+        stream = await self.client.chat.completions.create(
             model=self.model,
             messages=full_messages,
             stream=True,
         )
-        for chunk in stream:
+        async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
 
 class AnthropicLLMProvider(LLMProvider):
     def __init__(self) -> None:
-        from anthropic import Anthropic
+        from anthropic import AsyncAnthropic
 
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.model = settings.anthropic_chat_model
 
-    def stream_chat(
+    async def stream_chat(
         self, system_prompt: str, messages: list[dict[str, str]]
-    ) -> Generator[str, None, None]:
-        with self.client.messages.stream(
+    ) -> AsyncIterator[str]:
+        async with self.client.messages.stream(
             model=self.model,
             system=system_prompt,
             messages=messages,
             max_tokens=4096,
         ) as stream:
-            yield from stream.text_stream
+            async for text in stream.text_stream:
+                yield text
 
 
 @lru_cache(maxsize=1)
