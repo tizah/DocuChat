@@ -13,6 +13,10 @@ import type { Engine, ISourceOptions } from "@tsparticles/engine";
 export function ParticlesBackdrop() {
   const options = useMemo<ISourceOptions>(
     () => ({
+      // Default is a fixed-position canvas at z-index -1, which sits behind any
+      // wrapper with an opaque background. We render inside our own absolutely-
+      // positioned div instead.
+      fullScreen: { enable: false },
       background: { color: { value: "transparent" } },
       fpsLimit: 60,
       detectRetina: true,
