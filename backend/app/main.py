@@ -1,22 +1,45 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import text, update
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, async_session, engine
 from app.exceptions import AppError
 from app.logging_config import setup_logging
 from app.middleware import RequestLoggingMiddleware
 from app.models.chunk import Chunk  # noqa: F401
 from app.models.conversation import Conversation, Message  # noqa: F401
+from app.models.document import Document
 from app.models.user import RefreshToken, User  # noqa: F401
 from app.routers import auth, chat, chunks, conversations, documents
 
 setup_logging()
+logger = logging.getLogger(__name__)
+
+# Documents in any of these states were abandoned by a previous process
+# (crash, redeploy, OOM) — the background pipeline died mid-flight. Without
+# reconciliation they hang forever on the UI's polling spinner.
+NON_TERMINAL_DOC_STATUSES = ("processing", "extracting", "chunking", "embedding")
+
+
+async def _reconcile_stuck_documents() -> None:
+    async with async_session() as db:
+        result = await db.execute(
+            update(Document)
+            .where(Document.status.in_(NON_TERMINAL_DOC_STATUSES))
+            .values(
+                status="failed",
+                error_message="Processing was interrupted (server restart). Re-upload to retry.",
+            )
+        )
+        await db.commit()
+        if result.rowcount:
+            logger.warning("Reconciled %d stuck document(s) to failed on startup", result.rowcount)
 
 
 @asynccontextmanager
@@ -26,6 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if engine.dialect.name == "postgresql":
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+    await _reconcile_stuck_documents()
     yield
 
 
