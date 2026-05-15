@@ -3,23 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
+import { MarketingShell } from "@/components/marketing/marketing-shell";
+import { AuthCard } from "@/components/marketing/auth-card";
 
 export default function RegisterPage() {
   const { register, user, isLoading } = useAuth();
   const router = useRouter();
 
-  // Redirect if already logged in
   useEffect(() => {
     if (!isLoading && user) {
       router.replace("/documents");
     }
   }, [user, isLoading, router]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,25 +55,37 @@ export default function RegisterPage() {
     }
   }
 
+  const inputClasses =
+    "border-white/10 bg-white/[0.04] text-white placeholder:text-white/30 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/20";
+
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-            <FileText className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>Get started with DocuChat</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <MarketingShell>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <AuthCard
+          title="Create your account"
+          description="Start chatting with your documents in seconds"
+          footer={
+            <>
+              Already have an account?{" "}
+              <Link href="/login" className="text-cyan-300 hover:text-cyan-200">
+                Sign in
+              </Link>
+            </>
+          }
+        >
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div
+                role="alert"
+                className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+              >
                 {error}
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name" className="text-white/70">
+                Name
+              </Label>
               <Input
                 id="name"
                 type="text"
@@ -81,10 +93,13 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                className={inputClasses}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-white/70">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -92,10 +107,13 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className={inputClasses}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-white/70">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -103,30 +121,32 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className={inputClasses}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-white/70">
+                Confirm password
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                className={inputClasses}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creating account..." : "Create account"}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-cyan-500 to-cyan-400 text-black hover:from-cyan-400 hover:to-cyan-300 shadow-[0_0_24px_-6px_rgba(6,182,212,0.6)]"
+            >
+              {isSubmitting ? "Creating account…" : "Create account"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        </AuthCard>
+      </div>
+    </MarketingShell>
   );
 }
