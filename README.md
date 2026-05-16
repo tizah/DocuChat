@@ -1,5 +1,8 @@
 # DocuChat
 
+<img width="1376" height="768" alt="image" src="https://github.com/user-attachments/assets/1696de08-53fa-4d06-992f-5c414f6b1810" />
+
+
 **Chat with your documents.** Upload PDFs and DOCX files, then ask questions and get streamed answers with inline source citations grounded in the document text — not the model's prior knowledge.
 
 Built as a portfolio reference for a production-leaning RAG stack: typed Python on the backend, typed Next.js on the frontend, pluggable LLM providers, and a deploy story that fits free-tier infrastructure.
